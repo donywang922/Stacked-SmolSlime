@@ -113,6 +113,7 @@ void lis2_mag_read(float m[3])
 	err |= ssi_burst_read(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OUTX_L_REG, &rawData[0], 6);
 	if (err)
 		LOG_ERR("Communication error");
+	LOG_INF("Uni:%.4f,%.4f,%.4f", m[0], m[1], m[2]);
 	lis2_mag_process(rawData, m);
 }
 
