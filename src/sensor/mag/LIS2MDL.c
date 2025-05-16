@@ -113,13 +113,6 @@ void lis2_mag_read(float m[3])
 	err |= ssi_burst_read(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OUTX_L_REG, &rawData[0], 6);
 	if (err)
 		LOG_ERR("Communication error");
-	printf("Uni:");
-	for (int i = 0; i < 3; i++) // x, y, z
-	{
-		printf("%d",((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]));
-		printf(",");
-	}
-	printf("\r\n");
 	lis2_mag_process(rawData, m);
 }
 
@@ -140,12 +133,15 @@ float lis2_temp_read(float bias[3])
 
 void lis2_mag_process(uint8_t *raw_m, float m[3])
 {
+	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
+		mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
 		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
 		m[i] *= sensitivity;
 		m[i] /= 1000; // mGauss to gauss
 	}
+	LOG_INF("Uni:%d,%d,%d", mdata[0], mdata[1], mdata[2]);
 }
 
 const sensor_mag_t sensor_mag_lis2mdl = {
