@@ -117,9 +117,9 @@ void lis2_mag_read(float m[3])
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
 		printf("%d",((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]));
-		printf(",")
+		printf(",");
 	}
-	printf("\r\n")
+	printf("\r\n");
 	lis2_mag_process(rawData, m);
 }
 
