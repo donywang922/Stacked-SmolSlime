@@ -113,7 +113,7 @@ void lis2_mag_read(float m[3])
 	err |= ssi_burst_read(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OUTX_L_REG, &rawData[0], 6);
 	if (err)
 		LOG_ERR("Communication error");
-	printf("Uni:")
+	printf("Uni:");
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
 		printf("%d",((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]));
