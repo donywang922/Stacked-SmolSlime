@@ -13,18 +13,9 @@ LOG_MODULE_REGISTER(LIS2MDL, LOG_LEVEL_DBG);
 
 int lis2_init(float time, float *actual_time)
 {
-	int16_t offset[3] = { -437, -17, 923 };
-	uint8_t buf[6] = {
-		offset[0] & 0xFF, offset[0] >> 8,
-		offset[1] & 0xFF, offset[1] >> 8,
-		offset[2] & 0xFF, offset[2] >> 8,
-	};
-	int err = ssi_burst_write(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OFFSET_X_REG_L, buf, 6);
-	if (err)
-		LOG_ERR("Communication error");
 	// nothing to initialize..
 	last_odr = 0xff; // reset last odr
-	err = lis2_update_odr(time, actual_time);
+	int err = lis2_update_odr(time, actual_time);
 	return (err < 0 ? err : 0);
 }
 
@@ -142,11 +133,12 @@ float lis2_temp_read(float bias[3])
 
 void lis2_mag_process(uint8_t *raw_m, float m[3])
 {
+	int16_t offset[3] = { -437, -17, 923 };
 	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
-		mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
-		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
+		mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
+		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
 		m[i] *= sensitivity;
 		m[i] /= 1000; // mGauss to gauss
 	}
