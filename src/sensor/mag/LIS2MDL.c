@@ -19,7 +19,7 @@ int lis2_init(float time, float *actual_time)
 		offset[1] & 0xFF, offset[1] >> 8,
 		offset[2] & 0xFF, offset[2] >> 8,
 	};
-	int err = ssi_reg_write_buf(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OFFSET_X_REG_L, buf, 6);
+	int err = ssi_burst_write(SENSOR_INTERFACE_DEV_MAG, LIS2MDL_OFFSET_X_REG_L, buf, 6);
 	if (err)
 		LOG_ERR("Communication error");
 	// nothing to initialize..
