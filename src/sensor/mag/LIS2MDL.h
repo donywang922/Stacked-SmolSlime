@@ -10,6 +10,8 @@
 
 #define LIS2MDL_TEMP_OUT_L_REG 0x6E
 
+#define LIS2MDL_OFFSET_X_REG_L 0x45
+
 #define ODR_10Hz  0x00
 #define ODR_20Hz  0x01
 #define ODR_50Hz  0x02
