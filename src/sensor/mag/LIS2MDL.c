@@ -5,7 +5,7 @@
 #include "LIS2MDL.h"
 #include "LIS3MDL.h" // Common functions
 
-static const float sensitivity = 1.5 / 1000; // ~1.5 mgauss/LSB
+static const float sensitivity = 1.5; // ~1.5 mgauss/LSB
 
 static uint8_t last_odr = 0xff;
 
