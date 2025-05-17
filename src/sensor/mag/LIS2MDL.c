@@ -133,12 +133,12 @@ float lis2_temp_read(float bias[3])
 
 void lis2_mag_process(uint8_t *raw_m, float m[3])
 {
-	int16_t offset[3] = { -153, -247, -12 };
+	// int16_t offset[3] = { -153, -247, -12 };
 	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
 		// mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
-		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
+		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
 		m[i] *= sensitivity;
 		m[i] /= 1000; // mGauss to gauss
 	}
