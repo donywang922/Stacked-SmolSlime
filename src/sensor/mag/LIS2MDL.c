@@ -133,7 +133,7 @@ float lis2_temp_read(float bias[3])
 
 void lis2_mag_process(uint8_t *raw_m, float m[3])
 {
-	int16_t offset[3] = { -413, -47, 778 };
+	int16_t offset[3] = { -153, -247, -12 };
 	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
