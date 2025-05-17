@@ -137,12 +137,12 @@ void lis2_mag_process(uint8_t *raw_m, float m[3])
 	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
-		//mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
+		mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
 		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
 		m[i] *= sensitivity;
 		m[i] /= 1000; // mGauss to gauss
 	}
-	//LOG_INF("Uni:%d,%d,%d", mdata[0], mdata[1], mdata[2]);
+	LOG_INF("Uni:%d,%d,%d", mdata[0], mdata[1], mdata[2]);
 }
 
 const sensor_mag_t sensor_mag_lis2mdl = {
