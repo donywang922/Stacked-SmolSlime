@@ -162,7 +162,7 @@ static void led_resume(void)
 
 #ifdef LED_RGB_COLOR
 static int led_pwm_period[4][3] = {
-	{4000, 6000, 0}, // Default
+	{CONFIG_LED_DEFAULT_COLOR_R, CONFIG_LED_DEFAULT_COLOR_G, CONFIG_LED_DEFAULT_COLOR_B}, // Default
 	{0, 10000, 0}, // Success
 	{10000, 0, 0}, // Error
 	{8000, 2000, 0}, // Charging
@@ -176,7 +176,7 @@ static int led_pwm_period[4][3] = {
 };
 #elif defined(LED_RG_COLOR)
 static int led_pwm_period[4][2] = {
-	{4000, 6000}, // Default
+	{CONFIG_LED_DEFAULT_COLOR_R, CONFIG_LED_DEFAULT_COLOR_G}, // Default
 	{0, 10000}, // Success
 	{10000, 0}, // Error
 	{8000, 2000}, // Charging
@@ -251,17 +251,23 @@ void set_led(enum sys_led_pattern led_pattern, int priority)
 	{
 		led_suspend();
 		k_thread_suspend(led_thread_id);
+		LOG_DBG("set_led: suspended led_thread_id");
 	}
 	else if (k_current_get() != led_thread_id) // do not suspend if called from thread
 	{
 		k_thread_suspend(led_thread_id);
+		LOG_DBG("set_led: suspended led_thread_id");
 		led_resume();
 		k_thread_resume(led_thread_id);
+		k_wakeup(led_thread_id);
+		LOG_DBG("set_led: resumed led_thread_id");
 	}
 	else
 	{
 		led_resume();
 		k_thread_resume(led_thread_id);
+		k_wakeup(led_thread_id);
+		LOG_DBG("set_led: resumed led_thread_id");
 	}
 #endif
 }
@@ -274,6 +280,7 @@ static void led_thread(void)
 #else
 	while (1)
 	{
+		LOG_DBG("led_thread: current_led_pattern %d", current_led_pattern);
 		switch (current_led_pattern)
 		{
 		case SYS_LED_PATTERN_ON:
@@ -386,6 +393,7 @@ static void led_thread(void)
 			break;
 
 		default:
+			LOG_DBG("led_thread: suspending led_thread_id");
 			k_thread_suspend(led_thread_id);
 		}
 	}

@@ -278,7 +278,7 @@ uint16_t bmi_fifo_read(uint8_t *data, uint16_t len)
 			packets = limit;
 			count = packets * PACKET_SIZE;
 		}
-		err |= ssi_burst_read_interval(SENSOR_INTERFACE_DEV_IMU, BMI270_FIFO_DATA, data, count, 252); // Read FIFO data, less than 255 at a time (for nRF52832)
+		err |= ssi_burst_read_interval(SENSOR_INTERFACE_DEV_IMU, BMI270_FIFO_DATA, data, count, PACKET_SIZE);
 		if (err)
 			LOG_ERR("Communication error");
 		data += packets * PACKET_SIZE;
@@ -564,7 +564,5 @@ const sensor_imu_t sensor_imu_bmi270 = {
 	*bmi_setup_WOM,
 	
 	*imu_none_ext_setup,
-	*imu_none_fifo_process_ext,
-	*imu_none_ext_read,
 	*imu_none_ext_passthrough
 };

@@ -5,7 +5,7 @@
 #include "LIS2MDL.h"
 #include "LIS3MDL.h" // Common functions
 
-static const float sensitivity = 1.5; // ~1.5 mgauss/LSB
+static const float sensitivity = 1.5 / 1000; // ~1.5 mgauss/LSB -> 0.0015 G/LSB
 
 static uint8_t last_odr = 0xff;
 
@@ -133,16 +133,11 @@ float lis2_temp_read(float bias[3])
 
 void lis2_mag_process(uint8_t *raw_m, float m[3])
 {
-	// int16_t offset[3] = { -153, -247, -12 };
-	uint16_t mdata[3];
 	for (int i = 0; i < 3; i++) // x, y, z
 	{
-		// mdata[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]) - offset[i];
 		m[i] = (int16_t)((((uint16_t)raw_m[(i * 2) + 1]) << 8) | raw_m[i * 2]);
 		m[i] *= sensitivity;
-		m[i] /= 1000; // mGauss to gauss
 	}
-	// LOG_INF("Uni:%d,%d,%d", mdata[0], mdata[1], mdata[2]);
 }
 
 const sensor_mag_t sensor_mag_lis2mdl = {
@@ -156,5 +151,5 @@ const sensor_mag_t sensor_mag_lis2mdl = {
 	*lis2_temp_read,
 
 	*lis2_mag_process,
-	LIS2MDL_OUTX_L_REG
+	6, 6
 };

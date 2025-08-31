@@ -50,11 +50,51 @@ config LED_TRI_COLOR
 
 endchoice
 
+menu "Status LED default status color"
+    depends on LED_RGB_COLOR
+
+config LED_DEFAULT_COLOR_R
+    int "Red value"
+    range 0 10000
+    default 4000
+    depends on LED_RGB_COLOR
+    help
+        Red color for default status.
+        Valid range is 0 to 10000.
+
+config LED_DEFAULT_COLOR_G
+    int "Green value"
+    range 0 10000
+    default 6000
+    depends on LED_RGB_COLOR
+    help
+        Green color for default status.
+        Valid range is 0 to 10000.
+
+config LED_DEFAULT_COLOR_B
+    int "Blue value"
+    range 0 10000
+    default 0
+    depends on LED_RGB_COLOR
+    help
+        Blue color for default status.
+        Valid range is 0 to 10000.
+
+endmenu
+
+config USER_EXTRA_ACTIONS
+    bool "Multiple press actions"
+    default y
+    help
+        Allow user to use multiple presses to calibrate, pair, or enter DFU.
+        By default, pairing is available when holding down sw0 for 5 seconds.
+        By default, DFU is available when holding down sw0 and plugging in a USB cable.
+
 config IGNORE_RESET
     bool "Ignore reset"
     default y
     help
-        If sw0 is available, don't change any reset behavior.
+        If sw0 is available, don't perform any extra actions on reset.
 
 config USER_SHUTDOWN
     bool "User shutdown support"
@@ -157,7 +197,7 @@ config ACTIVE_TIMEOUT_THRESHOLD
 
 config ACTIVE_TIMEOUT_DELAY
     int "Activity timeout delay (ms)"
-    default 900000
+    default 1800000
     depends on USE_ACTIVE_TIMEOUT
     help
         Activity timeout duration when triggered.
@@ -166,18 +206,18 @@ endmenu
 
 config SENSOR_ACCEL_ODR
     int "Accelerometer output data rate (Hz)"
-    default 200
+    default 100
     help
         Requested accelerometer output data rate. Actual rate will be raised to the nearest supported rate.
         A higher rate will increase the time to read and process sensor data.
 
 config SENSOR_GYRO_ODR
     int "Gyrometer output data rate (Hz)"
-    default 500
+    default 200
     help
         Requested gyrometer output data rate. Actual rate will be raised to the nearest supported rate.
         A higher rate will increase the time to read and process sensor data.
-        400Hz is recommended for IMUs with poor gyrometer rate noise density. (Ex. BMI270, LSM6DS3TR-C)
+        A lower rate is recommended for IMUs with poor gyrometer rate noise density. (Ex. BMI270, LSM6DS3TR-C)
 
 config SENSOR_ACCEL_FS
     int "Accelerometer full scale (g)"
@@ -195,7 +235,7 @@ config SENSOR_GYRO_FS
 
 config SENSOR_USE_MAG
     bool "Magnetometer support"
-    default y
+    default n
     help
         Use magnetometer if it is present.
 
@@ -232,6 +272,22 @@ config SENSOR_USE_6_SIDE_CALIBRATION
     help
         Use 6-side calibration for accelerometer.
         Calibration can be completed through the basic console.
+
+config SENSOR_USE_SENS_CALIBRATION
+    bool "Use gyro sensitivity calibration"
+    default y
+    depends on USE_SLIMENRF_CONSOLE
+    help
+        Use sensitivity calibration for gyroscope.
+        Calibration can be completed by rotating the tracker specified number of times around all axis.
+        Note any resulting yaw drift in degrees and enter these three observed values in the basic console.
+
+config SENSOR_SENS_REV
+    int "Number of rotations (rev)"
+    default 2
+    depends on SENSOR_USE_SENS_CALIBRATION
+    help
+       Number of rotations used in calculating sensitivity calibration.
 
 config RADIO_TX_POWER
     int "Radio output power (dBm)"

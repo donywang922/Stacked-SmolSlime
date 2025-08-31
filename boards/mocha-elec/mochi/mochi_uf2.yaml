@@ -1,13 +1,13 @@
 # Copyright (c) 2024 Nordic Semiconductor ASA
 # SPDX-License-Identifier: Apache-2.0
 
-identifier: supermini_uf2/nrf52840/spi
-name: supermini_uf2_spi
-vendor: nordic
+identifier: mochi_uf2
+name: mochi_uf2
+vendor: mocha-elec
 type: mcu
 arch: arm
-ram: 256
-flash: 1024
+ram: 128
+flash: 512
 toolchain:
   - zephyr
   - gnuarmemb

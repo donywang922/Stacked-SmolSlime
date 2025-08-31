@@ -23,18 +23,6 @@ LOG_MODULE_REGISTER(BATTERY, CONFIG_ADC_LOG_LEVEL);
 #define VBATT DT_PATH(battery_divider)
 #define ZEPHYR_USER DT_PATH(zephyr_user)
 
-#ifdef CONFIG_BOARD_THINGY52_NRF52832
-/* This board uses a divider that reduces max voltage to
- * reference voltage (600 mV).
- */
-#define BATTERY_ADC_GAIN ADC_GAIN_1
-#else
-/* Other boards may use dividers that only reduce battery voltage to
- * the maximum supported by the hardware (3.6 V)
- */
-#define BATTERY_ADC_GAIN ADC_GAIN_1_6
-#endif
-
 struct io_channel_config {
 	uint8_t channel;
 };
@@ -111,15 +99,33 @@ static int divider_setup(void) {
 		.channels = BIT(0),
 		.buffer = &ddp->raw,
 		.buffer_size = sizeof(ddp->raw),
-		.oversampling = 4,
+		.oversampling = 7, // TODO: using R3 board, ADC is very noisy, are other boards okay?
 		.calibrate = true,
 	};
 
 #ifdef CONFIG_ADC_NRFX_SAADC
+	enum adc_gain battery_adc_gain = ADC_GAIN_1_6;
+
+	float max_adc_voltage = cfg->output_ohm != 0 ? 5.0f * cfg->output_ohm / cfg->full_ohm : 3.6f; // Maximum voltage on input
+
+	if (max_adc_voltage < 0.6f)
+		battery_adc_gain = ADC_GAIN_1;
+	else if (max_adc_voltage < 1.2f)
+		battery_adc_gain = ADC_GAIN_1_2;
+	else if (max_adc_voltage < 1.8f)
+		battery_adc_gain = ADC_GAIN_1_3;
+	else if (max_adc_voltage < 2.4f)
+		battery_adc_gain = ADC_GAIN_1_4;
+	else if (max_adc_voltage < 3.0f)
+		battery_adc_gain = ADC_GAIN_1_5;
+
+	LOG_INF("ADC gain enum: %d, max voltage: %.2f mV",
+		battery_adc_gain, (double)(max_adc_voltage * 1000.0f));
+
 	*accp = (struct adc_channel_cfg){
-		.gain = BATTERY_ADC_GAIN,
+		.gain = battery_adc_gain,
 		.reference = ADC_REF_INTERNAL,
-		.acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 40),
+		.acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 3),
 	};
 
 	if (cfg->output_ohm != 0) {
@@ -127,6 +133,11 @@ static int divider_setup(void) {
 							 + iocp->channel;
 	} else {
 		accp->input_positive = 9;  // SAADC_CH_PSELP_PSELP_VDD
+	}
+
+	if (iocp->channel == 12) { // VDDHDIV5
+		asp->oversampling = 2;
+		accp->acquisition_time = ADC_ACQ_TIME(ADC_ACQ_TIME_MICROSECONDS, 10);
 	}
 
 	asp->resolution = 14;

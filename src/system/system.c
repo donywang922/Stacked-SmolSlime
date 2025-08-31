@@ -25,7 +25,7 @@ LOG_MODULE_REGISTER(system, LOG_LEVEL_INF);
 #if DT_NODE_HAS_PROP(DT_ALIAS(sw0), gpios) // Alternate button if available to use as "reset key"
 #define BUTTON_EXISTS true
 static void button_thread(void);
-K_THREAD_DEFINE(button_thread_id, 512, button_thread, NULL, NULL, NULL, 6, 0, 0); // TODO: stack increased because of reboot request
+K_THREAD_DEFINE(button_thread_id, 1024, button_thread, NULL, NULL, NULL, 6, 0, 0); // TODO: stack increased because of reboot request (to 512) and sensor scan (to 1024)
 #else
 #pragma message "Button GPIO does not exist"
 #endif
@@ -161,12 +161,14 @@ static int sys_retained_init(void)
 		LOG_WRN("Invalidated RAM");
 		sys_nvs_init();
 		// read from nvs to retained
-		nvs_read(&fs, PAIRED_ID, &retained->paired_addr, sizeof(retained->paired_addr));
-		nvs_read(&fs, MAIN_SENSOR_DATA_ID, &retained->sensor_data, sizeof(retained->sensor_data));
-		nvs_read(&fs, MAIN_ACCEL_BIAS_ID, &retained->accelBias, sizeof(retained->accelBias));
-		nvs_read(&fs, MAIN_GYRO_BIAS_ID, &retained->gyroBias, sizeof(retained->gyroBias));
-		nvs_read(&fs, MAIN_MAG_BIAS_ID, &retained->magBAinv, sizeof(retained->magBAinv));
-		nvs_read(&fs, MAIN_ACC_6_BIAS_ID, &retained->accBAinv, sizeof(retained->accBAinv));
+		sys_read(PAIRED_ID, &retained->paired_addr, sizeof(retained->paired_addr));
+		sys_read(MAIN_SENSOR_DATA_ID, &retained->sensor_data, sizeof(retained->sensor_data));
+		sys_read(MAIN_ACCEL_BIAS_ID, &retained->accelBias, sizeof(retained->accelBias));
+		sys_read(MAIN_GYRO_BIAS_ID, &retained->gyroBias, sizeof(retained->gyroBias));
+		sys_read(MAIN_MAG_BIAS_ID, &retained->magBAinv, sizeof(retained->magBAinv));
+		sys_read(MAIN_ACC_6_BIAS_ID, &retained->accBAinv, sizeof(retained->accBAinv));
+		sys_read(BATT_STATS_CURVE_ID, &retained->battery_pptt_curve, sizeof(retained->battery_pptt_curve));
+		nvs_read(&fs, MAIN_GYRO_SENS_ID, &retained->gyroSensScale, sizeof(retained->gyroSensScale));
 		retained_update();
 	}
 	else
@@ -207,9 +209,55 @@ void reboot_counter_write(uint8_t reboot_counter)
 void sys_write(uint16_t id, void *retained_ptr, const void *data, size_t len)
 {
 	sys_nvs_init();
-	memcpy(retained_ptr, data, len);
-	nvs_write(&fs, id, data, len);
-	retained_update();
+	if (retained_ptr)
+		memcpy(retained_ptr, data, len);
+	int err = nvs_write(&fs, id, data, len);
+	if (err < 0)
+	{
+		LOG_ERR("Failed to write to NVS, error: %d", err);
+		return;
+	}
+	if (retained_ptr)
+		retained_update();
+}
+
+void sys_read(uint16_t id, void *data, size_t len)
+{
+	sys_nvs_init();
+	int err = nvs_read(&fs, id, data, len);
+	if (err < 0)
+	{
+		if (err == -ENOENT) // suppress ENOENT
+		{
+			LOG_DBG("No entry exists for ID %d, read data set to zero", id);
+		}
+		else
+		{
+			LOG_ERR("Failed to read from NVS, error: %d", err);
+			LOG_WRN("Read data set to zero");
+		}
+		memset(data, 0, len);
+		return;
+	}
+}
+
+void sys_clear(void)
+{
+	
+	static bool reset_confirm = false;
+	if (!reset_confirm)
+	{
+		printk("Resetting NVS and retained will clear all pairing, sensor calibration data, and battery calibration data. Are you sure?\n");
+		reset_confirm = true;
+		return;
+	}
+	printk("Resetting NVS and retained\n");
+
+	memset(retained, 0, sizeof(*retained));
+	nvs_clear(&fs);
+	nvs_init = false;
+	reset_confirm = false;
+	LOG_INF("NVS and retained reset");
 }
 
 // return 0 if clock applied, -1 if failed (because there is no clk_en or clk_out)
@@ -232,15 +280,18 @@ int set_sensor_clock(bool enable, float rate, float *actual_rate)
 
 #if BUTTON_EXISTS // Alternate button if available to use as "reset key"
 static const struct gpio_dt_spec button0 = GPIO_DT_SPEC_GET(DT_ALIAS(sw0), gpios);
-static int64_t press_time;
+static int64_t press_time = 0;
 static int64_t last_press_duration = 0;
 
 static void button_pressed(const struct device *dev, struct gpio_callback *cb, uint32_t pins)
 {
 	bool pressed = button_read();
-	if (press_time && !pressed && k_uptime_get() - press_time > 50) // debounce
-		last_press_duration = k_uptime_get() - press_time;
-	press_time = pressed ? k_uptime_get() : 0;
+	int64_t current_time = k_uptime_get();
+	if (press_time && !pressed && current_time - press_time > 50) // debounce
+		last_press_duration = current_time - press_time;
+	else if (press_time && pressed) // unusual press event on button already pressed
+		return;
+	press_time = pressed ? current_time : 0;
 }
 
 static struct gpio_callback button_cb_data;
@@ -273,10 +324,16 @@ static void button_thread(void)
 	int64_t last_press = 0;
 	while (1)
 	{
-		if (press_time)
-			set_led(SYS_LED_PATTERN_OFF_FORCE, SYS_LED_PRIORITY_HIGHEST);
+		if (press_time && k_uptime_get() - press_time > 50) // debounce
+		{
+			if (!get_status(SYS_STATUS_BUTTON_PRESSED))
+				set_status(SYS_STATUS_BUTTON_PRESSED, true);
+			set_led(SYS_LED_PATTERN_ON, SYS_LED_PRIORITY_HIGHEST);
+		}
 		if (last_press_duration > 50) // debounce
 		{
+			if (!get_status(SYS_STATUS_BUTTON_PRESSED))
+				set_status(SYS_STATUS_BUTTON_PRESSED, true);
 			num_presses++;
 			LOG_INF("Button pressed %d times", num_presses);
 			last_press_duration = 0;
@@ -289,12 +346,23 @@ static void button_thread(void)
 			last_press = 0;
 			if (num_presses == 1)
 				sys_request_system_reboot();
+#if CONFIG_USER_EXTRA_ACTIONS // TODO: extra actions are default until server can send commands to trackers
 			sys_reset_mode(num_presses - 1);
+#endif
 			num_presses = 0;
 			set_led(SYS_LED_PATTERN_OFF, SYS_LED_PRIORITY_HIGHEST);
+			set_status(SYS_STATUS_BUTTON_PRESSED, false);
 		}
 		if (press_time && k_uptime_get() - press_time > 1000 && button_read()) // Button is being held
-			sys_user_shutdown();
+		{
+			if (sys_user_shutdown()) // held for 5 seconds, reset pairing
+			{
+				LOG_INF("Pairing requested");
+				esb_reset_pair();
+				press_time = 0;
+				set_status(SYS_STATUS_BUTTON_PRESSED, false); // TODO: is needed?
+			}
+		}
 		k_msleep(20);
 	}
 }
@@ -352,42 +420,53 @@ bool stby_read(void)
 #endif
 }
 
-#if USER_SHUTDOWN_ENABLED
-void sys_user_shutdown(void)
+int sys_user_shutdown(void)
 {
+	int64_t start_time = k_uptime_get();
+#if USER_SHUTDOWN_ENABLED
 	LOG_INF("User shutdown requested");
 	reboot_counter_write(0);
 	set_led(SYS_LED_PATTERN_ONESHOT_POWEROFF, SYS_LED_PRIORITY_HIGHEST);
+#endif
 	k_msleep(1500);
 	if (button_read()) // If alternate button is available and still pressed, wait for the user to stop pressing the button
 	{
 		set_led(SYS_LED_PATTERN_LONG, SYS_LED_PRIORITY_HIGHEST);
 		while (button_read())
+		{
+			if (k_uptime_get() - start_time > 4000) // held for over 5 seconds, cancel shutdown
+			{
+				set_led(SYS_LED_PATTERN_OFF, SYS_LED_PRIORITY_HIGHEST);
+				return 1;
+			}
 			k_msleep(1);
+		}
 		set_led(SYS_LED_PATTERN_OFF_FORCE, SYS_LED_PRIORITY_HIGHEST);
 	}
+#if USER_SHUTDOWN_ENABLED
 	sys_request_system_off();
-}
+#else
+	sys_request_system_reboot();
 #endif
+	return 0;
+}
 
 void sys_reset_mode(uint8_t mode)
 {
 	switch (mode)
 	{
+#if CONFIG_USER_EXTRA_ACTIONS
 	case 1:
 		LOG_INF("IMU calibration requested");
 		sensor_request_calibration();
 		break;
-	// case 2: // Reset mode pairing reset
-	// 	LOG_INF("Pairing reset requested");
-	// 	esb_reset_pair();
-	// 	break;
-	case 3: // Reset mode pairing reset
+#endif
+	case 2: // Reset mode pairing reset
 		LOG_INF("Pairing reset requested");
 		esb_reset_pair();
 		break;
 #if DFU_EXISTS // Using DFU bootloader
-	// case 3:
+	case 3:
 	case 4: // Reset mode DFU
 		LOG_INF("DFU requested");
 #if ADAFRUIT_BOOTLOADER
